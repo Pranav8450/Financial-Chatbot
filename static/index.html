@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financial Literacy Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<style>
+  :root {
+    --paper: #FBF6EC;
+    --paper-line: #E4D9C4;
+    --ink: #1B2A4A;
+    --ink-soft: #5B6B8C;
+    --gold: #B8892E;
+    --gold-soft: #D9BD82;
+    --teal: #2F6F62;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); font-family: 'IBM Plex Sans', sans-serif;
+    color: var(--ink); display: flex; justify-content: center; min-height: 100vh;
+  }
+  .app { width: 100%; max-width: 640px; display: flex; flex-direction: column; min-height: 100vh; }
+
+  header { padding: 36px 28px 0; position: relative; }
+  header::before {
+    content: ""; position: absolute; left: 28px; right: 28px; top: 16px; height: 1px;
+    background: repeating-linear-gradient(to right, var(--gold-soft) 0, var(--gold-soft) 4px, transparent 4px, transparent 9px);
+  }
+  .wordmark { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 500; letter-spacing: -0.01em; margin: 0; }
+  .wordmark span { color: var(--teal); }
+  .tagline { margin: 6px 0 20px; font-size: 14.5px; color: var(--ink-soft); max-width: 46ch; }
+
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .history-btn {
+    display: flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--paper-line);
+    border-radius: 20px; padding: 6px 14px; font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px;
+    color: var(--ink-soft); cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .history-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* ---------- History sidebar ---------- */
+  .sidebar-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(27,42,74,0.35); z-index: 10;
+  }
+  .sidebar-backdrop.open { display: block; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 280px; max-width: 82vw;
+    background: var(--paper); border-right: 1px solid var(--paper-line); z-index: 11;
+    transform: translateX(-100%); transition: transform 0.22s ease;
+    display: flex; flex-direction: column; padding: 22px 0;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-header { padding: 0 20px 16px; border-bottom: 1px solid var(--paper-line); }
+  .sidebar-title { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 500; margin: 0 0 12px; }
+  .new-chat-btn {
+    width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--ink); background: var(--ink);
+    color: var(--paper); font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; font-weight: 500;
+    cursor: pointer; transition: opacity 0.15s ease;
+  }
+  .new-chat-btn:hover { opacity: 0.85; }
+  .session-list { flex: 1; overflow-y: auto; padding: 10px 12px; }
+  .session-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 10px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 2px;
+    font-size: 13.5px; color: var(--ink-soft); transition: background 0.15s ease;
+  }
+  .session-item:hover { background: rgba(47,111,98,0.06); }
+  .session-item.active { background: rgba(47,111,98,0.1); color: var(--ink); font-weight: 500; }
+  .session-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .session-delete {
+    background: none; border: none; color: #B5A98F; cursor: pointer; font-size: 15px; padding: 0 2px;
+    opacity: 0; transition: opacity 0.15s ease;
+  }
+  .session-item:hover .session-delete { opacity: 1; }
+  .session-delete:hover { color: #A0453A; }
+  .sidebar-empty { padding: 20px 10px; font-size: 13px; color: var(--ink-soft); }
+
+  /* ---------- Tabs ---------- */
+  .tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--paper-line); padding: 0 28px; }
+  .tab {
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; font-weight: 500; color: var(--ink-soft);
+    background: none; border: none; padding: 10px 0 12px; cursor: pointer; position: relative;
+  }
+  .tab.active { color: var(--ink); }
+  .tab.active::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--teal);
+  }
+
+  .view { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .view.active { display: flex; }
+
+  /* ---------- Ledger (chat log) ---------- */
+  #ledger { flex: 1; overflow-y: auto; padding: 8px 28px 20px; display: flex; flex-direction: column; gap: 4px; }
+  .entry { padding: 16px 0; border-bottom: 1px solid var(--paper-line); animation: settle 0.28s ease; }
+  .entry:last-child { border-bottom: none; }
+  @keyframes settle { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .entry-label { font-size: 11.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  .entry.user .entry-label { text-align: right; }
+  .bubble { font-size: 15px; line-height: 1.55; }
+  .entry.user .bubble {
+    background: var(--ink); color: var(--paper); padding: 12px 16px; border-radius: 14px 14px 3px 14px;
+    margin-left: auto; max-width: 82%; width: fit-content;
+  }
+  .entry.bot .bubble { border-left: 3px solid var(--teal); padding: 4px 0 4px 14px; }
+
+  /* ---------- Rendered markdown styling inside bot answers ---------- */
+  .bubble h2, .bubble h3 {
+    font-family: 'Fraunces', serif; font-weight: 500; color: var(--ink);
+    margin: 14px 0 6px; line-height: 1.3;
+  }
+  .bubble h2 { font-size: 17px; }
+  .bubble h3 { font-size: 15px; }
+  .bubble p { margin: 6px 0; }
+  .bubble ul, .bubble ol { margin: 6px 0; padding-left: 20px; }
+  .bubble li { margin: 3px 0; }
+  .bubble strong { color: var(--ink); font-weight: 600; }
+  .bubble table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13.5px; }
+  .bubble th, .bubble td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--paper-line); }
+  .bubble th { color: var(--ink-soft); font-weight: 600; font-size: 12px; }
+  .bubble code { background: rgba(47,111,98,0.08); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+
+  /* ---------- Markdown formatting inside bot answers ---------- */
+  .bubble strong { color: var(--ink); font-weight: 600; }
+  .bubble p { margin: 0 0 10px; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble ul, .bubble ol { margin: 8px 0; padding-left: 20px; }
+  .bubble li { margin-bottom: 4px; }
+  .bubble h1, .bubble h2, .bubble h3 {
+    font-family: 'Fraunces', serif; font-weight: 500; color: var(--ink);
+    margin: 14px 0 8px; font-size: 16px;
+  }
+  .bubble table {
+    border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13.5px;
+  }
+  .bubble th, .bubble td {
+    border: 1px solid var(--paper-line); padding: 8px 10px; text-align: left; vertical-align: top;
+  }
+  .bubble th {
+    background: #F3ECDC; font-family: 'Fraunces', serif; font-weight: 500; color: var(--ink);
+  }
+  .bubble hr { border: none; border-top: 1px solid var(--paper-line); margin: 14px 0; }
+  .bubble code {
+    background: #F3ECDC; padding: 1px 5px; border-radius: 4px; font-size: 13px;
+  }
+  .source-stub { display: inline-block; margin-top: 10px; padding-left: 14px; font-size: 12px; color: var(--teal); }
+  .thinking { display: flex; align-items: center; gap: 8px; padding-left: 14px; color: var(--ink-soft); font-size: 14px; font-style: italic; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); animation: pulse 1.1s ease-in-out infinite; }
+  .dot:nth-child(2) { animation-delay: 0.15s; }
+  .dot:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+  .welcome { padding: 20px 0; color: var(--ink-soft); font-size: 14.5px; line-height: 1.6; }
+  .welcome b { color: var(--ink); font-weight: 600; }
+
+  #input-row { padding: 16px 28px 26px; border-top: 1px solid var(--paper-line); }
+  .field { display: flex; align-items: flex-end; gap: 12px; border-bottom: 1.5px solid var(--ink); padding-bottom: 8px; }
+  #question { flex: 1; border: none; background: transparent; font-family: 'IBM Plex Sans', sans-serif; font-size: 15.5px; color: var(--ink); padding: 4px 0; outline: none; }
+  #question::placeholder { color: #A9A092; }
+  #send-btn, .reset-btn {
+    font-family: 'Fraunces', serif; font-size: 16px; background: none; border: none; color: var(--ink);
+    cursor: pointer; padding: 4px 2px 8px; transition: color 0.15s ease;
+  }
+  #send-btn:hover, .reset-btn:hover { color: var(--gold); }
+  #send-btn:disabled { color: #C7BFAF; cursor: default; }
+  .disclaimer { margin-top: 10px; font-size: 11.5px; color: #A69C88; }
+  .row-between { display: flex; justify-content: space-between; align-items: baseline; }
+
+  /* ---------- SIP Calculator ---------- */
+  #calculator { padding: 24px 28px 28px; overflow-y: auto; }
+  .calc-field { margin-bottom: 22px; }
+  .calc-label { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--ink-soft); margin-bottom: 8px; }
+  .calc-label b { color: var(--ink); font-family: 'Fraunces', serif; font-size: 15px; font-weight: 500; }
+  input[type="range"] {
+    width: 100%; -webkit-appearance: none; height: 2px; background: var(--paper-line); outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--teal); cursor: pointer;
+    margin-top: -7px;
+  }
+  input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--teal); border: none; cursor: pointer; }
+
+  .result-card {
+    margin-top: 8px; padding: 22px; background: var(--ink); border-radius: 12px; color: var(--paper);
+  }
+  .result-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+  .result-row + .result-row { border-top: 1px solid rgba(251,246,236,0.15); }
+  .result-row .label { color: var(--gold-soft); }
+  .result-row .value { font-family: 'Fraunces', serif; font-size: 17px; }
+  .result-row.total .value { color: var(--gold-soft); font-size: 22px; }
+  .calc-note { margin-top: 14px; font-size: 11.5px; color: #A69C88; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="header-top">
+      <h1 class="wordmark">Paisa<span>Patrika</span></h1>
+      <button class="history-btn" onclick="openSidebar()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+        Chat History
+      </button>
+    </div>
+    <p class="tagline">Ask about SIPs, FDs, mutual funds, stocks, tax, and more — plain-language answers, grounded in verified sources.</p>
+  </header>
+
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <p class="sidebar-title">Your chats</p>
+      <button class="new-chat-btn" onclick="startNewChat()">+ New chat</button>
+    </div>
+    <div class="session-list" id="sessionList"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="chat-view" onclick="switchTab('chat-view', this)">Chat</button>
+    <button class="tab" data-view="calc-view" onclick="switchTab('calc-view', this)">SIP Calculator</button>
+  </div>
+
+  <!-- ---------- Chat view ---------- -->
+  <div id="chat-view" class="view active">
+    <div id="ledger">
+      <div class="welcome">
+        New here? Try asking <b>"what is a SIP"</b> or <b>"how is FD interest taxed"</b>. This assistant remembers your conversation, so feel free to ask follow-ups. It explains concepts — it won't tell you what to buy or when to invest.
+      </div>
+    </div>
+    <div id="input-row">
+      <div class="field">
+        <input type="text" id="question" placeholder="Ask about SIP, FD, mutual funds, tax..." autocomplete="off" />
+        <button id="send-btn" onclick="sendQuestion()">Ask →</button>
+      </div>
+      <div class="row-between">
+        <p class="disclaimer">Educational content only — not personalised investment advice.</p>
+        <button class="reset-btn" onclick="startNewChat()" style="font-size:11.5px;">New chat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- SIP Calculator view ---------- -->
+  <div id="calc-view" class="view">
+    <div id="calculator">
+      <div class="calc-field">
+        <div class="calc-label"><span>Monthly investment</span><b id="amountLabel">₹5,000</b></div>
+        <input type="range" id="amount" min="500" max="100000" step="500" value="5000" oninput="calculateSIP()">
+      </div>
+      <div class="calc-field">
+        <div class="calc-label"><span>Investment period</span><b id="yearsLabel">10 years</b></div>
+        <input type="range" id="years" min="1" max="40" step="1" value="10" oninput="calculateSIP()">
+      </div>
+      <div class="calc-field">
+        <div class="calc-label"><span>Expected annual return</span><b id="rateLabel">12%</b></div>
+        <input type="range" id="rate" min="1" max="20" step="0.5" value="12" oninput="calculateSIP()">
+      </div>
+
+      <div class="result-card">
+        <div class="result-row"><span class="label">Total invested</span><span class="value" id="investedValue">₹6,00,000</span></div>
+        <div class="result-row"><span class="label">Estimated returns</span><span class="value" id="returnsValue">₹5,52,000</span></div>
+        <div class="result-row total"><span class="label">Estimated maturity value</span><span class="value" id="maturityValue">₹11,52,000</span></div>
+      </div>
+      <p class="calc-note">This is a mathematical illustration assuming a constant annual return, for education only — not a guarantee. Real mutual fund returns fluctuate and can be higher, lower, or negative. See the "SIP" topic in Chat for how this actually works.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ---------- Tabs ----------
+function switchTab(viewId, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(viewId).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ---------- Chat sessions (saved in this browser, like Claude/Gemini's chat history) ----------
+const STORAGE_KEY = 'paisapatrika_sessions';
+let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+let currentSessionId = null;
+let conversationHistory = []; // [{role: 'user'|'assistant', content: '...'}, ...] for the active chat
+
+function saveSessions() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+}
+
+function makeSessionId() {
+  return 'session_' + Date.now();
+}
+
+function renderSessionList() {
+  const list = document.getElementById('sessionList');
+  const ids = Object.keys(sessions).sort((a, b) => sessions[b].updatedAt - sessions[a].updatedAt);
+
+  if (ids.length === 0) {
+    list.innerHTML = `<div class="sidebar-empty">No saved chats yet. Ask a question to start one.</div>`;
+    return;
+  }
+
+  list.innerHTML = ids.map(id => {
+    const session = sessions[id];
+    const activeClass = id === currentSessionId ? 'active' : '';
+    return `<div class="session-item ${activeClass}" onclick="loadSession('${id}')">
+              <span class="session-title">${session.title}</span>
+              <button class="session-delete" onclick="event.stopPropagation(); deleteSession('${id}')">×</button>
+            </div>`;
+  }).join('');
+}
+
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarBackdrop').classList.add('open');
+  renderSessionList();
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarBackdrop').classList.remove('open');
+}
+
+function startNewChat() {
+  currentSessionId = null;
+  conversationHistory = [];
+  document.getElementById('ledger').innerHTML = `<div class="welcome">
+    New here? Try asking <b>"what is a SIP"</b> or <b>"how is FD interest taxed"</b>. This assistant remembers your conversation, so feel free to ask follow-ups. It explains concepts — it won't tell you what to buy or when to invest.
+  </div>`;
+  closeSidebar();
+}
+
+function loadSession(id) {
+  const session = sessions[id];
+  if (!session) return;
+  currentSessionId = id;
+  conversationHistory = session.messages.slice();
+
+  const ledger = document.getElementById('ledger');
+  ledger.innerHTML = '';
+  session.messages.forEach(msg => {
+    const entry = document.createElement('div');
+    entry.className = 'entry ' + (msg.role === 'user' ? 'user' : 'bot');
+    const label = msg.role === 'user' ? 'You' : 'Assistant';
+    const content = msg.role === 'user'
+      ? `<div class="bubble"></div>`
+      : `<div class="bubble">${marked.parse(msg.content)}</div>`;
+    entry.innerHTML = `<div class="entry-label">${label}</div>${content}`;
+    if (msg.role === 'user') entry.querySelector('.bubble').textContent = msg.content;
+    ledger.appendChild(entry);
+  });
+  ledger.scrollTop = ledger.scrollHeight;
+  closeSidebar();
+}
+
+function deleteSession(id) {
+  delete sessions[id];
+  saveSessions();
+  if (id === currentSessionId) startNewChat();
+  renderSessionList();
+}
+
+function saveCurrentTurn(question, answer) {
+  if (!currentSessionId) {
+    currentSessionId = makeSessionId();
+    sessions[currentSessionId] = {
+      title: question.length > 42 ? question.slice(0, 42) + '…' : question,
+      messages: [],
+      updatedAt: Date.now(),
+    };
+  }
+  const session = sessions[currentSessionId];
+  session.messages.push({ role: 'user', content: question });
+  session.messages.push({ role: 'assistant', content: answer });
+  session.updatedAt = Date.now();
+  saveSessions();
+}
+
+// Restore the most recent chat when the page loads, if one exists
+window.addEventListener('DOMContentLoaded', () => {
+  const ids = Object.keys(sessions).sort((a, b) => sessions[b].updatedAt - sessions[a].updatedAt);
+  if (ids.length > 0) loadSession(ids[0]);
+});
+
+async function sendQuestion() {
+  const input = document.getElementById('question');
+  const ledger = document.getElementById('ledger');
+  const button = document.getElementById('send-btn');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const userEntry = document.createElement('div');
+  userEntry.className = 'entry user';
+  userEntry.innerHTML = `<div class="entry-label">You</div><div class="bubble"></div>`;
+  userEntry.querySelector('.bubble').textContent = question;
+  ledger.appendChild(userEntry);
+
+  input.value = '';
+  button.disabled = true;
+
+  const thinkingEntry = document.createElement('div');
+  thinkingEntry.className = 'entry bot';
+  thinkingEntry.innerHTML = `<div class="entry-label">Assistant</div><div class="thinking"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+  ledger.appendChild(thinkingEntry);
+  ledger.scrollTop = ledger.scrollHeight;
+
+  try {
+    const res = await fetch('/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, history: conversationHistory })
+    });
+    const data = await res.json();
+    thinkingEntry.remove();
+
+    const botEntry = document.createElement('div');
+    botEntry.className = 'entry bot';
+    botEntry.innerHTML = `<div class="entry-label">Assistant</div><div class="bubble">${marked.parse(data.answer)}</div>`;
+    ledger.appendChild(botEntry);
+
+    // Keep the running history so follow-up questions have context
+    conversationHistory.push({ role: 'user', content: question });
+    conversationHistory.push({ role: 'assistant', content: data.answer });
+    // Keep only the last 10 turns so the request doesn't grow unbounded
+    if (conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+
+    // Save this exchange to the persistent chat history (sidebar)
+    saveCurrentTurn(question, data.answer);
+
+  } catch (err) {
+    thinkingEntry.remove();
+    const errorEntry = document.createElement('div');
+    errorEntry.className = 'entry bot';
+    errorEntry.innerHTML = `<div class="entry-label">Assistant</div><div class="bubble">Something went wrong reaching the server. Please try again.</div>`;
+    ledger.appendChild(errorEntry);
+  }
+
+  button.disabled = false;
+  ledger.scrollTop = ledger.scrollHeight;
+}
+
+document.getElementById('question').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') sendQuestion();
+});
+
+// ---------- SIP Calculator ----------
+function formatRupees(num) {
+  return '₹' + Math.round(num).toLocaleString('en-IN');
+}
+
+function calculateSIP() {
+  const amount = parseFloat(document.getElementById('amount').value);
+  const years = parseFloat(document.getElementById('years').value);
+  const rate = parseFloat(document.getElementById('rate').value);
+
+  document.getElementById('amountLabel').textContent = formatRupees(amount);
+  document.getElementById('yearsLabel').textContent = years + (years === 1 ? ' year' : ' years');
+  document.getElementById('rateLabel').textContent = rate + '%';
+
+  const months = years * 12;
+  const monthlyRate = rate / 100 / 12;
+  const invested = amount * months;
+
+  // Standard SIP future value formula
+  const maturity = monthlyRate === 0
+    ? invested
+    : amount * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
+
+  const returns = maturity - invested;
+
+  document.getElementById('investedValue').textContent = formatRupees(invested);
+  document.getElementById('returnsValue').textContent = formatRupees(returns);
+  document.getElementById('maturityValue').textContent = formatRupees(maturity);
+}
+
+calculateSIP(); // run once on load
+</script>
+</body>
+</html>
